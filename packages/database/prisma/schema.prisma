@@ -21,61 +21,6 @@ enum VerificationDecision {
   cleared
   rejected
 }
-
-enum PaymentMethod {
-  upi
-  cash
-}
-
-enum PaymentStatus {
-  pending
-  paid
-  failed
-}
-
-enum OrderStatus {
-  placed
-  accepted
-  rejected
-  fulfilled
-  cancelled
-}
-
-enum ComplaintSeverity {
-  general
-  safety
-}
-
-enum ComplaintStatus {
-  open
-  under_review
-  escalated
-  resolved
-}
-
-enum ReviewFlagReason {
-  duplicate_text
-  rating_text_mismatch
-  spam_pattern
-}
-
-enum ReviewFlagAction {
-  none
-  dismissed
-  removed
-}
-
-enum AdminRole {
-  admin
-  superadmin
-}
-
-enum NotificationChannel {
-  websocket
-  sms
-  email
-}
-
 model Station {
   id        String   @id @default(cuid())
   code      String   @unique
@@ -84,6 +29,10 @@ model Station {
   latitude  Float
   longitude Float
   createdAt DateTime @default(now())
+
+  checkIns VendorCheckIn[]
+
+  @@index([state])
 }
 
 model Vendor {
@@ -99,4 +48,42 @@ model Vendor {
   qrToken     String       @unique @default(cuid())
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+
+  verification VendorVerification?
+  checkIns     VendorCheckIn[]
+  catalogItems CatalogItem[]
+ 
+  @@index([status])
+  @@index([category])
+}
+
+model VendorVerification {
+  id                  String               @id @default(cuid())
+  vendorId            String               @unique
+  vendor              Vendor               @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  aadhaarHash         String
+  photoFingerprint    String?
+  selfieMatchPassed   Boolean?
+  decision            VerificationDecision @default(pending)
+  reviewedByAdminId   String?
+  decidedAt           DateTime?
+  createdAt           DateTime             @default(now())
+
+  @@index([aadhaarHash])
+  @@index([decision])
+}
+
+model VendorCheckIn {
+  id          String    @id @default(cuid())
+  vendorId    String
+  vendor      Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  stationId   String
+  station     Station   @relation(fields: [stationId], references: [id])
+  platform    String
+  checkedInAt DateTime  @default(now())
+  expiresAt   DateTime
+  checkedOutAt DateTime?
+
+  @@index([stationId, expiresAt])
+  @@index([vendorId])
 }
