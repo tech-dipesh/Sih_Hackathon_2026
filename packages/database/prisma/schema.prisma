@@ -8,3 +8,95 @@ datasource db {
   provider   = "postgresql"
   extensions = [pgcrypto]
 }
+
+enum VendorStatus {
+  pending
+  active
+  suspended
+  rejected
+}
+
+enum VerificationDecision {
+  pending
+  cleared
+  rejected
+}
+
+enum PaymentMethod {
+  upi
+  cash
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+}
+
+enum OrderStatus {
+  placed
+  accepted
+  rejected
+  fulfilled
+  cancelled
+}
+
+enum ComplaintSeverity {
+  general
+  safety
+}
+
+enum ComplaintStatus {
+  open
+  under_review
+  escalated
+  resolved
+}
+
+enum ReviewFlagReason {
+  duplicate_text
+  rating_text_mismatch
+  spam_pattern
+}
+
+enum ReviewFlagAction {
+  none
+  dismissed
+  removed
+}
+
+enum AdminRole {
+  admin
+  superadmin
+}
+
+enum NotificationChannel {
+  websocket
+  sms
+  email
+}
+
+model Station {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  state     String
+  latitude  Float
+  longitude Float
+  createdAt DateTime @default(now())
+}
+
+model Vendor {
+  id          String       @id @default(cuid())
+  name        String
+  phone       String       @unique
+  phoneVerifiedAt DateTime?
+  category    String
+  upiId       String
+  status      VendorStatus @default(pending)
+  soldOut     Boolean      @default(false)
+  passwordHash String?
+  qrToken     String       @unique @default(cuid())
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
