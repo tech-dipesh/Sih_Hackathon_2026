@@ -21,6 +21,25 @@ enum VerificationDecision {
   cleared
   rejected
 }
+
+enum PaymentMethod {
+  upi
+  cash
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+}
+
+enum OrderStatus {
+  placed
+  accepted
+  rejected
+  fulfilled
+  cancelled
+}
 model Station {
   id        String   @id @default(cuid())
   code      String   @unique
@@ -31,6 +50,7 @@ model Station {
   createdAt DateTime @default(now())
 
   checkIns VendorCheckIn[]
+  orders   Order[]
 
   @@index([state])
 }
@@ -52,7 +72,8 @@ model Vendor {
   verification VendorVerification?
   checkIns     VendorCheckIn[]
   catalogItems CatalogItem[]
- 
+  orders       Order[]
+
   @@index([status])
   @@index([category])
 }
@@ -86,4 +107,64 @@ model VendorCheckIn {
 
   @@index([stationId, expiresAt])
   @@index([vendorId])
+}
+
+model CatalogItem {
+  id        String   @id @default(cuid())
+  vendorId  String
+  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  name      String
+  priceInPaise Int
+  createdAt DateTime @default(now())
+
+  orderItems OrderItem[]
+
+  @@index([vendorId])
+}
+
+model Customer {
+  id              String    @id @default(cuid())
+  phone           String    @unique
+  phoneVerifiedAt DateTime?
+  email           String?   @unique
+  passwordHash    String?
+  createdAt       DateTime  @default(now())
+
+  orders Order[]
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  customerId      String?
+  customer        Customer?     @relation(fields: [customerId], references: [id])
+  guestPhone      String?
+  vendorId        String
+  vendor          Vendor        @relation(fields: [vendorId], references: [id])
+  stationId       String
+  station         Station       @relation(fields: [stationId], references: [id])
+  totalInPaise    Int
+  paymentMethod   PaymentMethod
+  paymentStatus   PaymentStatus @default(pending)
+  upiTransactionRef String?
+  status          OrderStatus   @default(placed)
+  placedAt        DateTime      @default(now())
+  acceptedAt      DateTime?
+  fulfilledAt     DateTime?
+
+  items      OrderItem[]
+
+  @@index([vendorId, status])
+  @@index([customerId])
+}
+
+model OrderItem {
+  id              String      @id @default(cuid())
+  orderId         String
+  order           Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  catalogItemId   String
+  catalogItem     CatalogItem @relation(fields: [catalogItemId], references: [id])
+  quantity        Int
+  priceAtOrderTimeInPaise Int
+
+  @@index([orderId])
 }
