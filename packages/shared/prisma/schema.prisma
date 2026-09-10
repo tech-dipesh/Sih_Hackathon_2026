@@ -1,0 +1,295 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [pgcrypto]
+}
+
+enum VendorStatus {
+  pending
+  active
+  suspended
+  rejected
+}
+
+enum VerificationDecision {
+  pending
+  cleared
+  rejected
+}
+
+enum PaymentMethod {
+  upi
+  cash
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+}
+
+enum OrderStatus {
+  placed
+  accepted
+  rejected
+  fulfilled
+  cancelled
+}
+
+enum ComplaintSeverity {
+  general
+  safety
+}
+
+enum ComplaintStatus {
+  open
+  under_review
+  escalated
+  resolved
+}
+
+enum ReviewFlagReason {
+  duplicate_text
+  rating_text_mismatch
+  spam_pattern
+}
+
+enum ReviewFlagAction {
+  none
+  dismissed
+  removed
+}
+
+enum AdminRole {
+  admin
+  superadmin
+}
+
+enum NotificationChannel {
+  websocket
+  sms
+  email
+}
+
+model Station {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  state     String
+  latitude  Float
+  longitude Float
+  createdAt DateTime @default(now())
+
+  checkIns VendorCheckIn[]
+  orders   Order[]
+
+  @@index([state])
+}
+
+model Vendor {
+  id          String       @id @default(cuid())
+  name        String
+  phone       String       @unique
+  phoneVerifiedAt DateTime?
+  category    String
+  upiId       String
+  status      VendorStatus @default(pending)
+  soldOut     Boolean      @default(false)
+  passwordHash String?
+  qrToken     String       @unique @default(cuid())
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  verification VendorVerification?
+  checkIns     VendorCheckIn[]
+  catalogItems CatalogItem[]
+  orders       Order[]
+  reviews      Review[]
+  escalations  VendorEscalation[]
+
+  @@index([status])
+  @@index([category])
+}
+
+model VendorVerification {
+  id                  String               @id @default(cuid())
+  vendorId            String               @unique
+  vendor              Vendor               @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  aadhaarHash         String
+  photoFingerprint    String?
+  selfieMatchPassed   Boolean?
+  decision            VerificationDecision @default(pending)
+  reviewedByAdminId   String?
+  reviewedByAdmin     AdminUser?           @relation(fields: [reviewedByAdminId], references: [id])
+  decidedAt           DateTime?
+  createdAt           DateTime             @default(now())
+
+  @@index([aadhaarHash])
+  @@index([decision])
+}
+
+model VendorCheckIn {
+  id          String    @id @default(cuid())
+  vendorId    String
+  vendor      Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  stationId   String
+  station     Station   @relation(fields: [stationId], references: [id])
+  platform    String
+  checkedInAt DateTime  @default(now())
+  expiresAt   DateTime
+  checkedOutAt DateTime?
+
+  @@index([stationId, expiresAt])
+  @@index([vendorId])
+}
+
+model CatalogItem {
+  id        String   @id @default(cuid())
+  vendorId  String
+  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  name      String
+  priceInPaise Int
+  createdAt DateTime @default(now())
+
+  orderItems OrderItem[]
+
+  @@index([vendorId])
+}
+
+model Customer {
+  id              String    @id @default(cuid())
+  phone           String    @unique
+  phoneVerifiedAt DateTime?
+  email           String?   @unique
+  passwordHash    String?
+  createdAt       DateTime  @default(now())
+
+  orders Order[]
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  customerId      String?
+  customer        Customer?     @relation(fields: [customerId], references: [id])
+  guestPhone      String?
+  vendorId        String
+  vendor          Vendor        @relation(fields: [vendorId], references: [id])
+  stationId       String
+  station         Station       @relation(fields: [stationId], references: [id])
+  totalInPaise    Int
+  paymentMethod   PaymentMethod
+  paymentStatus   PaymentStatus @default(pending)
+  upiTransactionRef String?
+  status          OrderStatus   @default(placed)
+  placedAt        DateTime      @default(now())
+  acceptedAt      DateTime?
+  fulfilledAt     DateTime?
+
+  items      OrderItem[]
+  review     Review?
+  complaints Complaint[]
+
+  @@index([vendorId, status])
+  @@index([customerId])
+}
+
+model OrderItem {
+  id              String      @id @default(cuid())
+  orderId         String
+  order           Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  catalogItemId   String
+  catalogItem     CatalogItem @relation(fields: [catalogItemId], references: [id])
+  quantity        Int
+  priceAtOrderTimeInPaise Int
+
+  @@index([orderId])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id])
+  vendorId  String
+  vendor    Vendor   @relation(fields: [vendorId], references: [id])
+  rating    Int
+  text      String?
+  createdAt DateTime @default(now())
+
+  flags ReviewFlag[]
+
+  @@index([vendorId])
+}
+
+model ReviewFlag {
+  id            String            @id @default(cuid())
+  reviewId      String
+  review        Review            @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  reason        ReviewFlagReason
+  generatedAt   DateTime          @default(now())
+  action        ReviewFlagAction  @default(none)
+  reviewedByAdminId String?
+  reviewedByAdmin   AdminUser?    @relation(fields: [reviewedByAdminId], references: [id])
+
+  @@index([action])
+}
+
+model Complaint {
+  id              String            @id @default(cuid())
+  orderId         String
+  order           Order             @relation(fields: [orderId], references: [id])
+  filedByPhone    String
+  seatNumber      String
+  severity        ComplaintSeverity @default(general)
+  status          ComplaintStatus   @default(open)
+  adminNotes      String?
+  createdAt       DateTime          @default(now())
+  resolvedAt      DateTime?
+
+  @@index([severity, status])
+  @@index([orderId])
+}
+
+model VendorEscalation {
+  id                    String   @id @default(cuid())
+  vendorId              String
+  vendor                Vendor   @relation(fields: [vendorId], references: [id])
+  complaintCountSnapshot Int
+  triggeredAt           DateTime @default(now())
+  reviewStatus          ComplaintStatus @default(escalated)
+  resolution            String?
+
+  @@index([vendorId])
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String?
+  role         AdminRole @default(admin)
+  mfaSecret    String?
+  mfaEnabled   Boolean   @default(false)
+  oauthProvider String?
+  createdAt    DateTime  @default(now())
+
+  verifications VendorVerification[]
+  reviewFlags   ReviewFlag[]
+}
+
+model NotificationEvent {
+  id            String              @id @default(cuid())
+  recipientType String
+  recipientId   String
+  eventType     String
+  channel       NotificationChannel
+  payload       Json
+  deliveredAt   DateTime?
+  createdAt     DateTime            @default(now())
+
+  @@index([recipientType, recipientId])
+}
