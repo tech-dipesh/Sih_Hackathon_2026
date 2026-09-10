@@ -1,0 +1,12 @@
+{
+  "name": "@railvendor/eslint-config",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./index.js",
+  "dependencies": {
+    "eslint": "^9.17.0",
+    "typescript-eslint": "^8.18.0",
+    "eslint-plugin-unused-imports": "^4.1.4"
+  }
+}
